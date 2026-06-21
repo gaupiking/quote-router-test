@@ -1,71 +1,93 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Quote Router v9 測試台</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
-    h1 { font-size: 1.4rem; color: #38bdf8; margin-bottom: 20px; }
-    .panel { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-    label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; }
-    input, select { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155;
-      background: #0f172a; color: #e2e8f0; font-size: 0.9rem; margin-bottom: 14px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .row > div { flex: 1; min-width: 160px; }
-    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-    .toggle-row input[type=checkbox] { width: auto; }
-    button { background: #0ea5e9; color: white; border: none; padding: 10px 28px;
-      border-radius: 8px; font-size: 0.95rem; cursor: pointer; }
-    button:hover { background: #0284c7; }
-    button:disabled { background: #334155; cursor: not-allowed; }
-    #results { margin-top: 0; }
-    .ticker-card { background: #0f172a; border: 1px solid #334155; border-radius: 10px;
-      padding: 16px; margin-bottom: 12px; }
-    .ticker-card.error { border-color: #ef4444; }
-    .ticker-card.ok { border-color: #22c55e; }
-    .ticker-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .symbol { font-size: 1.1rem; font-weight: bold; color: #f8fafc; }
-    .price { font-size: 1.3rem; font-weight: bold; }
-    .price.up { color: #f87171; }
-    .price.down { color: #4ade80; }
-    .price.flat { color: #94a3b8; }
-    .meta { font-size: 0.78rem; color: #64748b; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
-    .badge { background: #1e293b; border: 1px solid #334155; border-radius: 4px; padding: 2px 8px; }
-    .badge.rt { border-color: #0ea5e9; color: #38bdf8; }
-    .badge.delayed { border-color: #f59e0b; color: #fbbf24; }
-    .badge.eod { border-color: #8b5cf6; color: #a78bfa; }
-    .telemetry { margin-top: 10px; font-size: 0.78rem; color: #475569; border-top: 1px solid #1e293b; padding-top: 8px; }
-    .sources-row { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
-    .src { font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; }
-    .src.succeeded { background: #14532d; color: #86efac; }
-    .src.skipped { background: #1e1b4b; color: #818cf8; }
-    .src.failed { background: #450a0a; color: #fca5a5; }
-    .err-msg { color: #f87171; font-size: 0.82rem; margin-top: 6px; }
-    #raw-toggle { font-size: 0.75rem; color: #475569; cursor: pointer; margin-top: 8px; display: inline-block; }
-    #raw-box { display: none; background: #020617; border-radius: 8px; padding: 14px;
-      font-size: 0.72rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
-      color: #94a3b8; margin-top: 8px; max-height: 400px; overflow-y: auto; }
-    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #334155;
-      border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;font-size:14px}
+    h1{font-size:1.2rem;color:#38bdf8;margin-bottom:16px}
+    .panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:14px}
+    .panel-title{font-size:0.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+    label{display:block;font-size:0.75rem;color:#94a3b8;margin-bottom:4px}
+    input,select{width:100%;padding:7px 10px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:0.85rem;margin-bottom:10px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row>div{flex:1;min-width:140px}
+    .toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:0.85rem}
+    .toggle-row input[type=checkbox]{width:auto;margin:0}
+    button{background:#0ea5e9;color:#fff;border:none;padding:9px 24px;border-radius:7px;font-size:0.9rem;cursor:pointer;width:100%}
+    button:disabled{background:#334155;cursor:not-allowed}
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .6s linear infinite;margin-right:6px;vertical-align:middle}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Meta 橫幅 */
+    .meta-bar{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .meta-item{font-size:0.72rem;display:flex;gap:4px}
+    .meta-label{color:#64748b}
+    .meta-val{color:#e2e8f0;font-weight:600}
+    .meta-val.green{color:#4ade80}
+    .meta-val.yellow{color:#fbbf24}
+    .meta-val.red{color:#f87171}
+    .meta-val.blue{color:#38bdf8}
+
+    /* 來源 row */
+    .src-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+    .src-badge{font-size:0.7rem;padding:3px 8px;border-radius:4px;font-weight:600}
+    .src-badge.succeeded{background:#14532d;color:#86efac;border:1px solid #166534}
+    .src-badge.skipped{background:#1e1b4b;color:#818cf8;border:1px solid #3730a3}
+    .src-badge.requested{background:#1c1917;color:#a8a29e;border:1px solid #292524}
+
+    /* 股票卡片 */
+    .source-section{margin-bottom:16px}
+    .source-label{font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;padding-left:2px}
+    .ticker-card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:8px}
+    .ticker-card.ok{border-left:3px solid #22c55e}
+    .ticker-card.error{border-left:3px solid #ef4444}
+    .ticker-card.skipped-card{border-left:3px solid #6366f1;opacity:.6}
+    .ticker-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+    .symbol-block .symbol{font-size:1rem;font-weight:700;color:#f8fafc}
+    .symbol-block .name{font-size:0.72rem;color:#64748b;margin-top:1px}
+    .price-block{text-align:right}
+    .price{font-size:1.1rem;font-weight:700}
+    .price.up{color:#f87171}
+    .price.down{color:#4ade80}
+    .price.flat{color:#94a3b8}
+    .change-text{font-size:0.72rem;margin-top:2px}
+    .change-text.up{color:#f87171}
+    .change-text.down{color:#4ade80}
+    .change-text.flat{color:#64748b}
+
+    .ticker-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+    .badge{font-size:0.68rem;padding:2px 7px;border-radius:4px;border:1px solid #334155;color:#94a3b8}
+    .badge.rt{border-color:#0ea5e9;color:#38bdf8}
+    .badge.delayed{border-color:#f59e0b;color:#fbbf24}
+    .badge.eod{border-color:#8b5cf6;color:#a78bfa}
+    .badge.latency{border-color:#334155;color:#64748b}
+    .badge.ago{border-color:#334155;color:#a3e635}
+    .err-msg{font-size:0.75rem;color:#f87171;margin-top:6px}
+
+    .detail-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #1e293b;font-size:0.72rem;color:#64748b}
+    .detail-item .dv{color:#e2e8f0}
+
+    #raw-toggle{font-size:0.72rem;color:#475569;cursor:pointer;display:block;margin-top:10px}
+    #raw-box{display:none;background:#020617;border-radius:7px;padding:12px;font-size:0.68rem;overflow:auto;white-space:pre-wrap;word-break:break-all;color:#94a3b8;margin-top:8px;max-height:350px}
   </style>
 </head>
 <body>
-
 <h1>📡 Quote Router v9 測試台</h1>
 
 <div class="panel">
+  <div class="panel-title">查詢參數</div>
   <div class="row">
     <div>
       <label>股票代號（逗號分隔）</label>
-      <input id="symbols" type="text" value="2330,2317,0050,00878" placeholder="e.g. 2330,2317,0050"/>
+      <input id="symbols" value="2330,2317,0050,00878"/>
     </div>
     <div>
       <label>mode</label>
       <select id="mode">
-        <option value="auto">auto</option>
+        <option value="auto">auto（依時間自動）</option>
         <option value="realtime">realtime</option>
         <option value="daily">daily</option>
       </select>
@@ -83,156 +105,208 @@
     </div>
   </div>
   <div class="toggle-row">
-    <input type="checkbox" id="persist" checked />
-    <label for="persist" style="margin:0; cursor:pointer;">persist（寫入 DB）</label>
+    <input type="checkbox" id="persist" checked/>
+    <label for="persist" style="margin:0;cursor:pointer;color:#e2e8f0">persist（寫入 DB）</label>
   </div>
   <button id="submit-btn" onclick="runQuery()">🚀 送出查詢</button>
 </div>
 
-<div class="panel" id="results-panel" style="display:none;">
+<div id="results-panel" style="display:none">
+  <div class="panel">
+    <div class="panel-title">回應總覽</div>
+    <div id="meta-bar" class="meta-bar"></div>
+    <div id="src-row" class="src-row"></div>
+    <div id="rate-bar" style="font-size:0.72rem;color:#64748b;margin-bottom:4px"></div>
+  </div>
   <div id="results"></div>
   <span id="raw-toggle" onclick="toggleRaw()">▶ 顯示原始 JSON</span>
   <pre id="raw-box"></pre>
 </div>
 
 <script>
-const SUPABASE_URL = 'https://murynwlbdgxkimfgunfx.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cnlud2xiZGd4a2ltZmd1bmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4Mzc4MDAsImV4cCI6MjA5NTQxMzgwMH0.Zhz9S4wUEaoQhMNke_EPoGqfdw21yvshNBFx4GUNfuI';
+const SUPABASE_URL='https://murynwlbdgxkimfgunfx.supabase.co'
+const ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cnlud2xiZGd4a2ltZmd1bmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4Mzc4MDAsImV4cCI6MjA5NTQxMzgwMH0.Zhz9S4wUEaoQhMNke_EPoGqfdw21yvshNBFx4GUNfuI'
 
-let lastRaw = null;
+let timer=null
 
-async function runQuery() {
-  const btn = document.getElementById('submit-btn');
-  const resultsDiv = document.getElementById('results');
-  const panel = document.getElementById('results-panel');
+function fmtAgo(isoStr){
+  if(!isoStr)return null
+  const diff=Math.floor((Date.now()-new Date(isoStr).getTime())/1000)
+  if(diff<0)return '剛剛'
+  if(diff<60)return `${diff}秒前`
+  if(diff<3600)return `${Math.floor(diff/60)}分${diff%60}秒前`
+  return `${Math.floor(diff/3600)}時${Math.floor((diff%3600)/60)}分前`
+}
 
-  const symbols = document.getElementById('symbols').value
-    .split(',').map(s => s.trim()).filter(Boolean);
-  const mode = document.getElementById('mode').value;
-  const force_source = document.getElementById('force_source').value;
-  const persist = document.getElementById('persist').checked;
+function freshnessClass(f){
+  if(!f)return''
+  if(f==='near_realtime')return'rt'
+  if(f==='delayed_20m+')return'delayed'
+  return'eod'
+}
 
-  if (!symbols.length) { alert('請輸入至少一個股票代號'); return; }
+function priceClass(chg){
+  if(chg==null)return'flat'
+  return chg>0?'up':chg<0?'down':'flat'
+}
 
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>查詢中...';
-  resultsDiv.innerHTML = '';
-  panel.style.display = 'none';
+function metaItem(label,val,cls=''){
+  return`<div class="meta-item"><span class="meta-label">${label}</span><span class="meta-val ${cls}">${val}</span></div>`
+}
 
-  const body = { symbols, mode, persist };
-  if (force_source) body.force_source = force_source;
+async function runQuery(){
+  const btn=document.getElementById('submit-btn')
+  const symbols=document.getElementById('symbols').value.split(',').map(s=>s.trim()).filter(Boolean)
+  const mode=document.getElementById('mode').value
+  const force_source=document.getElementById('force_source').value
+  const persist=document.getElementById('persist').checked
+  if(!symbols.length){alert('請輸入股票代號');return}
 
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/quote-router-v9`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ANON_KEY}`
-      },
-      body: JSON.stringify(body)
-    });
+  if(timer)clearInterval(timer)
+  btn.disabled=true
+  btn.innerHTML='<span class="spinner"></span>查詢中...'
+  document.getElementById('results-panel').style.display='none'
 
-    const data = await res.json();
-    lastRaw = data;
-    document.getElementById('raw-box').textContent = JSON.stringify(data, null, 2);
-    document.getElementById('raw-toggle').textContent = '▶ 顯示原始 JSON';
-    document.getElementById('raw-box').style.display = 'none';
+  const body={symbols,mode,persist}
+  if(force_source)body.force_source=force_source
 
-    renderResults(data, symbols);
-    panel.style.display = 'block';
-  } catch (e) {
-    resultsDiv.innerHTML = `<div class="err-msg">❌ 請求失敗：${e.message}</div>`;
-    panel.style.display = 'block';
+  try{
+    const res=await fetch(`${SUPABASE_URL}/functions/v1/quote-router-v9`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${ANON_KEY}`},
+      body:JSON.stringify(body)
+    })
+    const data=await res.json()
+    document.getElementById('raw-box').textContent=JSON.stringify(data,null,2)
+    document.getElementById('raw-toggle').textContent='▶ 顯示原始 JSON'
+    document.getElementById('raw-box').style.display='none'
+    renderAll(data)
+    document.getElementById('results-panel').style.display='block'
+
+    // 每秒更新「多久前」計數
+    timer=setInterval(()=>updateAgo(data),1000)
+  }catch(e){
+    document.getElementById('results').innerHTML=`<div style="color:#f87171">❌ 請求失敗：${e.message}</div>`
+    document.getElementById('results-panel').style.display='block'
   }
-
-  btn.disabled = false;
-  btn.innerHTML = '🚀 送出查詢';
+  btn.disabled=false
+  btn.innerHTML='🚀 送出查詢'
 }
 
-function freshnessClass(f) {
-  if (!f) return '';
-  if (f.includes('realtime') || f === 'live') return 'rt';
-  if (f.includes('delayed')) return 'delayed';
-  return 'eod';
+function renderAll(data){
+  // Meta bar
+  const m=data.meta||{}
+  const metaHtml=[
+    metaItem('resolved_mode',data.mode||'?', data.mode==='realtime'?'blue':'green'),
+    metaItem('data_time_synced', m.data_time_synchronized?'✓ yes':'✗ no', m.data_time_synchronized?'green':'red'),
+    m.is_official_data_delayed_fallback?metaItem('delayed_fallback','⚠ yes','yellow'):'',
+    m.realtime_fallback_triggered?metaItem('rt_fallback_triggered','⚠ yes','yellow'):'',
+    m.persist_skipped?metaItem('persist_skipped',m.persist_skipped,'yellow'):'',
+  ].join('')
+  document.getElementById('meta-bar').innerHTML=metaHtml
+
+  // 來源 badges
+  const req=new Set(data.requested_sources||[])
+  const suc=new Set(data.succeeded_sources||[])
+  const skp=new Set(data.skipped_sources||[])
+  const srcHtml=[...req].map(s=>{
+    const cls=suc.has(s)?'succeeded':skp.has(s)?'skipped':'requested'
+    const icon=suc.has(s)?'✓':skp.has(s)?'⊘':'○'
+    return`<span class="src-badge ${cls}">${icon} ${s}</span>`
+  }).join('')
+  document.getElementById('src-row').innerHTML=srcHtml
+
+  // Rate limit
+  const rt=data.rate_limit_telemetry||{}
+  document.getElementById('rate-bar').textContent=
+    `Fugle 本次請求數：${rt.fugle_requests_this_call??0}　建議 polling 間隔：${rt.recommended_polling_interval_seconds??'-'}秒`
+
+  // 結果
+  const resultsDiv=document.getElementById('results')
+  const results=data.results||{}
+  resultsDiv.innerHTML=''
+
+  const symbolBuckets=data.symbol_buckets||[]
+
+  Object.entries(results).forEach(([sourceKey,rows])=>{
+    const sec=document.createElement('div')
+    sec.className='source-section'
+    sec.innerHTML=`<div class="source-label">${sourceKey}</div>`
+
+    ;(rows||[]).forEach((q,i)=>{
+      if(!q)return
+      const bucketInfo=symbolBuckets[i]||{}
+      const sym=q.symbol||'?'
+      const name=q.name||(bucketInfo.name||null)
+      const price=q.last_price
+      const chg=q.change
+      const chgPct=q.change_pct
+      const freshness=q.data_freshness||''
+      const asOf=q.as_of
+      const latency=q.telemetry?.latency_ms
+      const errType=q.telemetry?.error_type
+      const status=q.telemetry?.status||''
+      const prevClose=q.prev_close
+      const prevCloseType=q.prev_close_type
+      const volume=q.volume
+      const bucket=q.bucket||''
+      const isSkipped=status.includes('SKIPPED')
+      const hasError=!!errType||price===null
+
+      const pClass=priceClass(chg)
+      const fClass=freshnessClass(freshness)
+
+      const card=document.createElement('div')
+      card.className=`ticker-card ${isSkipped?'skipped-card':hasError?'error':'ok'}`
+      card.dataset.asof=asOf||''
+
+      const agoStr=fmtAgo(asOf)
+
+      card.innerHTML=`
+        <div class="ticker-head">
+          <div class="symbol-block">
+            <div class="symbol">${sym}</div>
+            ${name?`<div class="name">${name}</div>`:''}
+          </div>
+          <div class="price-block">
+            <div class="price ${pClass}">${price!=null?price.toFixed(2):'N/A'}</div>
+            ${chg!=null?`<div class="change-text ${pClass}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgPct!=null?(chgPct>=0?'+':'')+chgPct.toFixed(2)+'%':''})</div>`:''}
+          </div>
+        </div>
+        <div class="ticker-meta">
+          ${freshness?`<span class="badge ${fClass}">${freshness}</span>`:''}
+          ${latency!=null?`<span class="badge latency">${latency}ms</span>`:''}
+          ${agoStr?`<span class="badge ago" data-asof="${asOf||''}">${agoStr}</span>`:''}
+        </div>
+        ${errType?`<div class="err-msg">⚠ ${errType} — ${status}</div>`:''}
+        ${isSkipped?`<div class="err-msg" style="color:#818cf8">⊘ ${status}</div>`:''}
+        <div class="detail-row">
+          ${prevClose!=null?`<div class="detail-item">昨收 <span class="dv">${prevClose.toFixed(2)}</span>${prevCloseType?` <span style="color:#475569">(${prevCloseType})</span>`:''}</div>`:''}
+          ${volume!=null?`<div class="detail-item">成交量 <span class="dv">${volume.toLocaleString()}</span></div>`:''}
+          ${bucket?`<div class="detail-item">bucket <span class="dv">${bucket}</span></div>`:''}
+          ${asOf?`<div class="detail-item">as_of <span class="dv">${new Date(asOf).toLocaleTimeString('zh-TW')}</span></div>`:''}
+        </div>`
+
+      sec.appendChild(card)
+    })
+    resultsDiv.appendChild(sec)
+  })
 }
 
-function priceClass(chg) {
-  if (!chg && chg !== 0) return 'flat';
-  if (chg > 0) return 'up';
-  if (chg < 0) return 'down';
-  return 'flat';
+// 每秒更新所有「幾秒前」badge
+function updateAgo(data){
+  document.querySelectorAll('.badge.ago[data-asof]').forEach(el=>{
+    const asOf=el.dataset.asof
+    if(asOf)el.textContent=fmtAgo(asOf)||''
+  })
 }
 
-function renderResults(data, symbols) {
-  const resultsDiv = document.getElementById('results');
-
-  // 支援 { quotes: [...] } 或 { results: {...} } 或直接 array
-  let quotes = [];
-  if (Array.isArray(data)) quotes = data;
-  else if (data.quotes) quotes = data.quotes;
-  else if (data.results) quotes = Object.values(data.results).flat();
-  else if (data.data) quotes = Array.isArray(data.data) ? data.data : Object.values(data.data).flat();
-
-  if (!quotes.length) {
-    resultsDiv.innerHTML = `<div class="err-msg">⚠️ 沒有回傳任何 quote 資料，請看原始 JSON。</div>`;
-    return;
-  }
-
-  resultsDiv.innerHTML = quotes.map(q => {
-    const sym = q.symbol || q.ticker || '?';
-    const price = q.last_price ?? q.price ?? q.close ?? null;
-    const chg = q.change ?? null;
-    const chgPct = q.change_pct ?? q.change_percent ?? null;
-    const source = q.source_key ?? q.source ?? '';
-    const freshness = q.data_freshness ?? q.freshness ?? '';
-    const asOf = q.as_of ?? q.timestamp ?? '';
-    const latency = q.telemetry?.latency_ms ?? q.latency_ms ?? null;
-    const errType = q.telemetry?.error_type ?? q.error_type ?? null;
-    const succeeded = q.telemetry?.succeeded_sources ?? q.succeeded_sources ?? [];
-    const skipped = q.telemetry?.skipped_sources ?? q.skipped_sources ?? [];
-    const failed = q.telemetry?.failed_sources ?? q.failed_sources ?? [];
-    const hasError = !!errType || price === null;
-
-    const fClass = freshnessClass(freshness);
-    const pClass = priceClass(chg);
-
-    const srcBadges = [
-      ...succeeded.map(s => `<span class="src succeeded">✓ ${s}</span>`),
-      ...skipped.map(s => `<span class="src skipped">⊘ ${s}</span>`),
-      ...failed.map(s => `<span class="src failed">✗ ${s}</span>`),
-    ].join('');
-
-    return `
-    <div class="ticker-card ${hasError ? 'error' : 'ok'}">
-      <div class="ticker-head">
-        <span class="symbol">${sym}</span>
-        <span class="price ${pClass}">
-          ${price !== null ? price.toFixed(2) : 'N/A'}
-          ${chg !== null ? `<small style="font-size:0.75rem">${chg >= 0 ? '+' : ''}${chg.toFixed(2)} (${chgPct !== null ? (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%' : ''})</small>` : ''}
-        </span>
-      </div>
-      <div class="meta">
-        ${source ? `<span class="badge">${source}</span>` : ''}
-        ${freshness ? `<span class="badge ${fClass}">${freshness}</span>` : ''}
-        ${asOf ? `<span class="badge">${new Date(asOf).toLocaleTimeString('zh-TW')}</span>` : ''}
-        ${latency !== null ? `<span class="badge">${latency}ms</span>` : ''}
-      </div>
-      ${errType ? `<div class="err-msg">⚠ ${errType}</div>` : ''}
-      ${srcBadges ? `<div class="sources-row">${srcBadges}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-function toggleRaw() {
-  const box = document.getElementById('raw-box');
-  const btn = document.getElementById('raw-toggle');
-  if (box.style.display === 'none') {
-    box.style.display = 'block';
-    btn.textContent = '▼ 隱藏原始 JSON';
-  } else {
-    box.style.display = 'none';
-    btn.textContent = '▶ 顯示原始 JSON';
-  }
+function toggleRaw(){
+  const box=document.getElementById('raw-box')
+  const btn=document.getElementById('raw-toggle')
+  const show=box.style.display==='none'
+  box.style.display=show?'block':'none'
+  btn.textContent=show?'▼ 隱藏原始 JSON':'▶ 顯示原始 JSON'
 }
 </script>
 </body>
