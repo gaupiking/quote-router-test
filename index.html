@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quote Router v9 測試台</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+    h1 { font-size: 1.4rem; color: #38bdf8; margin-bottom: 20px; }
+    .panel { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; }
+    input, select { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155;
+      background: #0f172a; color: #e2e8f0; font-size: 0.9rem; margin-bottom: 14px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 160px; }
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .toggle-row input[type=checkbox] { width: auto; }
+    button { background: #0ea5e9; color: white; border: none; padding: 10px 28px;
+      border-radius: 8px; font-size: 0.95rem; cursor: pointer; }
+    button:hover { background: #0284c7; }
+    button:disabled { background: #334155; cursor: not-allowed; }
+    #results { margin-top: 0; }
+    .ticker-card { background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+      padding: 16px; margin-bottom: 12px; }
+    .ticker-card.error { border-color: #ef4444; }
+    .ticker-card.ok { border-color: #22c55e; }
+    .ticker-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .symbol { font-size: 1.1rem; font-weight: bold; color: #f8fafc; }
+    .price { font-size: 1.3rem; font-weight: bold; }
+    .price.up { color: #f87171; }
+    .price.down { color: #4ade80; }
+    .price.flat { color: #94a3b8; }
+    .meta { font-size: 0.78rem; color: #64748b; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge { background: #1e293b; border: 1px solid #334155; border-radius: 4px; padding: 2px 8px; }
+    .badge.rt { border-color: #0ea5e9; color: #38bdf8; }
+    .badge.delayed { border-color: #f59e0b; color: #fbbf24; }
+    .badge.eod { border-color: #8b5cf6; color: #a78bfa; }
+    .telemetry { margin-top: 10px; font-size: 0.78rem; color: #475569; border-top: 1px solid #1e293b; padding-top: 8px; }
+    .sources-row { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .src { font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; }
+    .src.succeeded { background: #14532d; color: #86efac; }
+    .src.skipped { background: #1e1b4b; color: #818cf8; }
+    .src.failed { background: #450a0a; color: #fca5a5; }
+    .err-msg { color: #f87171; font-size: 0.82rem; margin-top: 6px; }
+    #raw-toggle { font-size: 0.75rem; color: #475569; cursor: pointer; margin-top: 8px; display: inline-block; }
+    #raw-box { display: none; background: #020617; border-radius: 8px; padding: 14px;
+      font-size: 0.72rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+      color: #94a3b8; margin-top: 8px; max-height: 400px; overflow-y: auto; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #334155;
+      border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<h1>📡 Quote Router v9 測試台</h1>
+
+<div class="panel">
+  <div class="row">
+    <div>
+      <label>股票代號（逗號分隔）</label>
+      <input id="symbols" type="text" value="2330,2317,0050,00878" placeholder="e.g. 2330,2317,0050"/>
+    </div>
+    <div>
+      <label>mode</label>
+      <select id="mode">
+        <option value="auto">auto</option>
+        <option value="realtime">realtime</option>
+        <option value="daily">daily</option>
+      </select>
+    </div>
+    <div>
+      <label>force_source（選填）</label>
+      <select id="force_source">
+        <option value="">(不指定)</option>
+        <option value="fugle_rt">fugle_rt</option>
+        <option value="yahoo_rt">yahoo_rt</option>
+        <option value="finmind_day">finmind_day</option>
+        <option value="twse_day">twse_day</option>
+        <option value="tpex_day">tpex_day</option>
+      </select>
+    </div>
+  </div>
+  <div class="toggle-row">
+    <input type="checkbox" id="persist" checked />
+    <label for="persist" style="margin:0; cursor:pointer;">persist（寫入 DB）</label>
+  </div>
+  <button id="submit-btn" onclick="runQuery()">🚀 送出查詢</button>
+</div>
+
+<div class="panel" id="results-panel" style="display:none;">
+  <div id="results"></div>
+  <span id="raw-toggle" onclick="toggleRaw()">▶ 顯示原始 JSON</span>
+  <pre id="raw-box"></pre>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://murynwlbdgxkimfgunfx.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cnlud2xiZGd4a2ltZmd1bmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4Mzc4MDAsImV4cCI6MjA5NTQxMzgwMH0.Zhz9S4wUEaoQhMNke_EPoGqfdw21yvshNBFx4GUNfuI';
+
+let lastRaw = null;
+
+async function runQuery() {
+  const btn = document.getElementById('submit-btn');
+  const resultsDiv = document.getElementById('results');
+  const panel = document.getElementById('results-panel');
+
+  const symbols = document.getElementById('symbols').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const mode = document.getElementById('mode').value;
+  const force_source = document.getElementById('force_source').value;
+  const persist = document.getElementById('persist').checked;
+
+  if (!symbols.length) { alert('請輸入至少一個股票代號'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>查詢中...';
+  resultsDiv.innerHTML = '';
+  panel.style.display = 'none';
+
+  const body = { symbols, mode, persist };
+  if (force_source) body.force_source = force_source;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/quote-router-v9`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ANON_KEY}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    lastRaw = data;
+    document.getElementById('raw-box').textContent = JSON.stringify(data, null, 2);
+    document.getElementById('raw-toggle').textContent = '▶ 顯示原始 JSON';
+    document.getElementById('raw-box').style.display = 'none';
+
+    renderResults(data, symbols);
+    panel.style.display = 'block';
+  } catch (e) {
+    resultsDiv.innerHTML = `<div class="err-msg">❌ 請求失敗：${e.message}</div>`;
+    panel.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '🚀 送出查詢';
+}
+
+function freshnessClass(f) {
+  if (!f) return '';
+  if (f.includes('realtime') || f === 'live') return 'rt';
+  if (f.includes('delayed')) return 'delayed';
+  return 'eod';
+}
+
+function priceClass(chg) {
+  if (!chg && chg !== 0) return 'flat';
+  if (chg > 0) return 'up';
+  if (chg < 0) return 'down';
+  return 'flat';
+}
+
+function renderResults(data, symbols) {
+  const resultsDiv = document.getElementById('results');
+
+  // 支援 { quotes: [...] } 或 { results: {...} } 或直接 array
+  let quotes = [];
+  if (Array.isArray(data)) quotes = data;
+  else if (data.quotes) quotes = data.quotes;
+  else if (data.results) quotes = Object.values(data.results).flat();
+  else if (data.data) quotes = Array.isArray(data.data) ? data.data : Object.values(data.data).flat();
+
+  if (!quotes.length) {
+    resultsDiv.innerHTML = `<div class="err-msg">⚠️ 沒有回傳任何 quote 資料，請看原始 JSON。</div>`;
+    return;
+  }
+
+  resultsDiv.innerHTML = quotes.map(q => {
+    const sym = q.symbol || q.ticker || '?';
+    const price = q.last_price ?? q.price ?? q.close ?? null;
+    const chg = q.change ?? null;
+    const chgPct = q.change_pct ?? q.change_percent ?? null;
+    const source = q.source_key ?? q.source ?? '';
+    const freshness = q.data_freshness ?? q.freshness ?? '';
+    const asOf = q.as_of ?? q.timestamp ?? '';
+    const latency = q.telemetry?.latency_ms ?? q.latency_ms ?? null;
+    const errType = q.telemetry?.error_type ?? q.error_type ?? null;
+    const succeeded = q.telemetry?.succeeded_sources ?? q.succeeded_sources ?? [];
+    const skipped = q.telemetry?.skipped_sources ?? q.skipped_sources ?? [];
+    const failed = q.telemetry?.failed_sources ?? q.failed_sources ?? [];
+    const hasError = !!errType || price === null;
+
+    const fClass = freshnessClass(freshness);
+    const pClass = priceClass(chg);
+
+    const srcBadges = [
+      ...succeeded.map(s => `<span class="src succeeded">✓ ${s}</span>`),
+      ...skipped.map(s => `<span class="src skipped">⊘ ${s}</span>`),
+      ...failed.map(s => `<span class="src failed">✗ ${s}</span>`),
+    ].join('');
+
+    return `
+    <div class="ticker-card ${hasError ? 'error' : 'ok'}">
+      <div class="ticker-head">
+        <span class="symbol">${sym}</span>
+        <span class="price ${pClass}">
+          ${price !== null ? price.toFixed(2) : 'N/A'}
+          ${chg !== null ? `<small style="font-size:0.75rem">${chg >= 0 ? '+' : ''}${chg.toFixed(2)} (${chgPct !== null ? (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%' : ''})</small>` : ''}
+        </span>
+      </div>
+      <div class="meta">
+        ${source ? `<span class="badge">${source}</span>` : ''}
+        ${freshness ? `<span class="badge ${fClass}">${freshness}</span>` : ''}
+        ${asOf ? `<span class="badge">${new Date(asOf).toLocaleTimeString('zh-TW')}</span>` : ''}
+        ${latency !== null ? `<span class="badge">${latency}ms</span>` : ''}
+      </div>
+      ${errType ? `<div class="err-msg">⚠ ${errType}</div>` : ''}
+      ${srcBadges ? `<div class="sources-row">${srcBadges}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleRaw() {
+  const box = document.getElementById('raw-box');
+  const btn = document.getElementById('raw-toggle');
+  if (box.style.display === 'none') {
+    box.style.display = 'block';
+    btn.textContent = '▼ 隱藏原始 JSON';
+  } else {
+    box.style.display = 'none';
+    btn.textContent = '▶ 顯示原始 JSON';
+  }
+}
+</script>
+</body>
+</html>
