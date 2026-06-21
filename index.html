@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Quote Router v9 測試台</title>
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;font-size:14px}
@@ -20,8 +21,6 @@
     button:disabled{background:#334155;cursor:not-allowed}
     .spinner{display:inline-block;width:13px;height:13px;border:2px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .6s linear infinite;margin-right:6px;vertical-align:middle}
     @keyframes spin{to{transform:rotate(360deg)}}
-
-    /* Meta 橫幅 */
     .meta-bar{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .meta-item{font-size:0.72rem;display:flex;gap:4px}
     .meta-label{color:#64748b}
@@ -30,21 +29,19 @@
     .meta-val.yellow{color:#fbbf24}
     .meta-val.red{color:#f87171}
     .meta-val.blue{color:#38bdf8}
-
-    /* 來源 row */
     .src-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
     .src-badge{font-size:0.7rem;padding:3px 8px;border-radius:4px;font-weight:600}
     .src-badge.succeeded{background:#14532d;color:#86efac;border:1px solid #166534}
     .src-badge.skipped{background:#1e1b4b;color:#818cf8;border:1px solid #3730a3}
     .src-badge.requested{background:#1c1917;color:#a8a29e;border:1px solid #292524}
-
-    /* 股票卡片 */
     .source-section{margin-bottom:16px}
     .source-label{font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;padding-left:2px}
-    .ticker-card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:8px}
+    .ticker-card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+    .ticker-card:hover{border-color:#38bdf8}
     .ticker-card.ok{border-left:3px solid #22c55e}
     .ticker-card.error{border-left:3px solid #ef4444}
     .ticker-card.skipped-card{border-left:3px solid #6366f1;opacity:.6}
+    .ticker-card.active-chart{border-color:#38bdf8;border-left-color:#38bdf8}
     .ticker-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
     .symbol-block .symbol{font-size:1rem;font-weight:700;color:#f8fafc}
     .symbol-block .name{font-size:0.72rem;color:#64748b;margin-top:1px}
@@ -57,26 +54,40 @@
     .change-text.up{color:#f87171}
     .change-text.down{color:#4ade80}
     .change-text.flat{color:#64748b}
-
     .ticker-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
     .badge{font-size:0.68rem;padding:2px 7px;border-radius:4px;border:1px solid #334155;color:#94a3b8}
     .badge.rt{border-color:#0ea5e9;color:#38bdf8}
     .badge.delayed{border-color:#f59e0b;color:#fbbf24}
     .badge.eod{border-color:#8b5cf6;color:#a78bfa}
-    .badge.latency{border-color:#334155;color:#64748b}
     .badge.ago{border-color:#334155;color:#a3e635}
     .err-msg{font-size:0.75rem;color:#f87171;margin-top:6px}
-
     .detail-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #1e293b;font-size:0.72rem;color:#64748b}
     .detail-item .dv{color:#e2e8f0}
-
+    /* K線圖區域 */
+    #chart-panel{display:none}
+    .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .chart-title{font-size:0.9rem;font-weight:700;color:#f8fafc}
+    .chart-subtitle{font-size:0.72rem;color:#64748b}
+    #chart-container{height:260px;border-radius:8px;overflow:hidden}
+    .chart-empty{height:260px;display:flex;align-items:center;justify-content:center;color:#475569;font-size:0.82rem;background:#0f172a;border-radius:8px;border:1px dashed #334155}
+    /* securities table */
+    #sec-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+    #sec-table th{text-align:left;color:#64748b;font-weight:500;padding:6px 8px;border-bottom:1px solid #334155}
+    #sec-table td{padding:6px 8px;border-bottom:1px solid #1e293b;color:#e2e8f0}
+    #sec-table tr:hover td{background:#334155}
+    #sec-table td.up{color:#f87171}
+    #sec-table td.down{color:#4ade80}
     #raw-toggle{font-size:0.72rem;color:#475569;cursor:pointer;display:block;margin-top:10px}
     #raw-box{display:none;background:#020617;border-radius:7px;padding:12px;font-size:0.68rem;overflow:auto;white-space:pre-wrap;word-break:break-all;color:#94a3b8;margin-top:8px;max-height:350px}
+    .tab-row{display:flex;gap:2px;margin-bottom:12px}
+    .tab-btn{padding:5px 14px;border-radius:6px;border:1px solid #334155;background:transparent;color:#64748b;font-size:0.78rem;cursor:pointer}
+    .tab-btn.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
   </style>
 </head>
 <body>
 <h1>📡 Quote Router v9 測試台</h1>
 
+<!-- 查詢參數 -->
 <div class="panel">
   <div class="panel-title">查詢參數</div>
   <div class="row">
@@ -111,6 +122,7 @@
   <button id="submit-btn" onclick="runQuery()">🚀 送出查詢</button>
 </div>
 
+<!-- 回應結果 -->
 <div id="results-panel" style="display:none">
   <div class="panel">
     <div class="panel-title">回應總覽</div>
@@ -118,7 +130,28 @@
     <div id="src-row" class="src-row"></div>
     <div id="rate-bar" style="font-size:0.72rem;color:#64748b;margin-bottom:4px"></div>
   </div>
+
+  <!-- K線圖 -->
+  <div class="panel" id="chart-panel">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title" id="chart-title">—</div>
+        <div class="chart-subtitle">5分K線（來自 quotes_live）</div>
+      </div>
+      <div id="chart-range" style="font-size:0.72rem;color:#64748b"></div>
+    </div>
+    <div id="chart-container"></div>
+  </div>
+
+  <!-- 各來源 quote 結果 -->
   <div id="results"></div>
+
+  <!-- securities DB 狀態 -->
+  <div class="panel" id="sec-panel" style="display:none">
+    <div class="panel-title">📦 securities（DB 現況）</div>
+    <div id="sec-body"></div>
+  </div>
+
   <span id="raw-toggle" onclick="toggleRaw()">▶ 顯示原始 JSON</span>
   <pre id="raw-box"></pre>
 </div>
@@ -126,34 +159,43 @@
 <script>
 const SUPABASE_URL='https://murynwlbdgxkimfgunfx.supabase.co'
 const ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cnlud2xiZGd4a2ltZmd1bmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4Mzc4MDAsImV4cCI6MjA5NTQxMzgwMH0.Zhz9S4wUEaoQhMNke_EPoGqfdw21yvshNBFx4GUNfuI'
+const HEADERS={'Content-Type':'application/json','Authorization':`Bearer ${ANON_KEY}`,'apikey':ANON_KEY}
 
-let timer=null
+let agoTimer=null
+let chartInstance=null
+let candleSeries=null
+let currentChartSymbol=null
 
-function fmtAgo(isoStr){
-  if(!isoStr)return null
-  const diff=Math.floor((Date.now()-new Date(isoStr).getTime())/1000)
-  if(diff<0)return '剛剛'
-  if(diff<60)return `${diff}秒前`
-  if(diff<3600)return `${Math.floor(diff/60)}分${diff%60}秒前`
-  return `${Math.floor(diff/3600)}時${Math.floor((diff%3600)/60)}分前`
+// ── Supabase REST helper ──────────────────────────────────
+async function sbSelect(table,params=''){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{headers:{...HEADERS,'Accept':'application/json'}})
+  return res.json()
 }
 
+// ── 格式工具 ─────────────────────────────────────────────
+function fmtAgo(iso){
+  if(!iso)return null
+  const d=Math.floor((Date.now()-new Date(iso).getTime())/1000)
+  if(d<0)return'剛剛'
+  if(d<60)return`${d}秒前`
+  if(d<3600)return`${Math.floor(d/60)}分${d%60}秒前`
+  return`${Math.floor(d/3600)}時${Math.floor((d%3600)/60)}分前`
+}
 function freshnessClass(f){
   if(!f)return''
   if(f==='near_realtime')return'rt'
   if(f==='delayed_20m+')return'delayed'
   return'eod'
 }
-
 function priceClass(chg){
   if(chg==null)return'flat'
   return chg>0?'up':chg<0?'down':'flat'
 }
-
 function metaItem(label,val,cls=''){
   return`<div class="meta-item"><span class="meta-label">${label}</span><span class="meta-val ${cls}">${val}</span></div>`
 }
 
+// ── 主查詢 ────────────────────────────────────────────────
 async function runQuery(){
   const btn=document.getElementById('submit-btn')
   const symbols=document.getElementById('symbols').value.split(',').map(s=>s.trim()).filter(Boolean)
@@ -162,7 +204,7 @@ async function runQuery(){
   const persist=document.getElementById('persist').checked
   if(!symbols.length){alert('請輸入股票代號');return}
 
-  if(timer)clearInterval(timer)
+  if(agoTimer)clearInterval(agoTimer)
   btn.disabled=true
   btn.innerHTML='<span class="spinner"></span>查詢中...'
   document.getElementById('results-panel').style.display='none'
@@ -171,20 +213,29 @@ async function runQuery(){
   if(force_source)body.force_source=force_source
 
   try{
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/quote-router-v9`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${ANON_KEY}`},
-      body:JSON.stringify(body)
-    })
-    const data=await res.json()
-    document.getElementById('raw-box').textContent=JSON.stringify(data,null,2)
+    const [quoteRes, secData]=await Promise.all([
+      fetch(`${SUPABASE_URL}/functions/v1/quote-router-v9`,{
+        method:'POST',headers:HEADERS,body:JSON.stringify(body)
+      }).then(r=>r.json()),
+      sbSelect('securities',`symbol=in.(${symbols.map(s=>`"${s}"`).join(',')})&select=symbol,name,price,prev_close,change,change_pct,data_freshness,bucket,type,as_of,updated_at&order=symbol`)
+    ])
+
+    document.getElementById('raw-box').textContent=JSON.stringify(quoteRes,null,2)
     document.getElementById('raw-toggle').textContent='▶ 顯示原始 JSON'
     document.getElementById('raw-box').style.display='none'
-    renderAll(data)
+
+    // 建立 name map
+    const nameMap={}
+    if(Array.isArray(secData))secData.forEach(r=>{nameMap[r.symbol]=r.name})
+
+    renderAll(quoteRes,nameMap)
+    renderSecurities(secData)
     document.getElementById('results-panel').style.display='block'
 
-    // 每秒更新「多久前」計數
-    timer=setInterval(()=>updateAgo(data),1000)
+    agoTimer=setInterval(()=>document.querySelectorAll('.badge.ago[data-asof]').forEach(el=>{
+      if(el.dataset.asof)el.textContent=fmtAgo(el.dataset.asof)||''
+    }),1000)
+
   }catch(e){
     document.getElementById('results').innerHTML=`<div style="color:#f87171">❌ 請求失敗：${e.message}</div>`
     document.getElementById('results-panel').style.display='block'
@@ -193,51 +244,43 @@ async function runQuery(){
   btn.innerHTML='🚀 送出查詢'
 }
 
-function renderAll(data){
-  // Meta bar
+// ── 渲染總覽 ──────────────────────────────────────────────
+function renderAll(data,nameMap){
   const m=data.meta||{}
-  const metaHtml=[
-    metaItem('resolved_mode',data.mode||'?', data.mode==='realtime'?'blue':'green'),
-    metaItem('data_time_synced', m.data_time_synchronized?'✓ yes':'✗ no', m.data_time_synchronized?'green':'red'),
+  document.getElementById('meta-bar').innerHTML=[
+    metaItem('resolved_mode',data.mode||'?',data.mode==='realtime'?'blue':'green'),
+    metaItem('data_time_synced',m.data_time_synchronized?'✓ yes':'✗ no',m.data_time_synchronized?'green':'red'),
     m.is_official_data_delayed_fallback?metaItem('delayed_fallback','⚠ yes','yellow'):'',
     m.realtime_fallback_triggered?metaItem('rt_fallback_triggered','⚠ yes','yellow'):'',
     m.persist_skipped?metaItem('persist_skipped',m.persist_skipped,'yellow'):'',
   ].join('')
-  document.getElementById('meta-bar').innerHTML=metaHtml
 
-  // 來源 badges
   const req=new Set(data.requested_sources||[])
   const suc=new Set(data.succeeded_sources||[])
   const skp=new Set(data.skipped_sources||[])
-  const srcHtml=[...req].map(s=>{
+  document.getElementById('src-row').innerHTML=[...req].map(s=>{
     const cls=suc.has(s)?'succeeded':skp.has(s)?'skipped':'requested'
     const icon=suc.has(s)?'✓':skp.has(s)?'⊘':'○'
     return`<span class="src-badge ${cls}">${icon} ${s}</span>`
   }).join('')
-  document.getElementById('src-row').innerHTML=srcHtml
 
-  // Rate limit
   const rt=data.rate_limit_telemetry||{}
   document.getElementById('rate-bar').textContent=
     `Fugle 本次請求數：${rt.fugle_requests_this_call??0}　建議 polling 間隔：${rt.recommended_polling_interval_seconds??'-'}秒`
 
-  // 結果
   const resultsDiv=document.getElementById('results')
-  const results=data.results||{}
   resultsDiv.innerHTML=''
-
+  const results=data.results||{}
   const symbolBuckets=data.symbol_buckets||[]
 
   Object.entries(results).forEach(([sourceKey,rows])=>{
     const sec=document.createElement('div')
     sec.className='source-section'
     sec.innerHTML=`<div class="source-label">${sourceKey}</div>`
-
     ;(rows||[]).forEach((q,i)=>{
       if(!q)return
-      const bucketInfo=symbolBuckets[i]||{}
       const sym=q.symbol||'?'
-      const name=q.name||(bucketInfo.name||null)
+      const name=nameMap[sym]||null
       const price=q.last_price
       const chg=q.change
       const chgPct=q.change_pct
@@ -252,30 +295,29 @@ function renderAll(data){
       const bucket=q.bucket||''
       const isSkipped=status.includes('SKIPPED')
       const hasError=!!errType||price===null
-
       const pClass=priceClass(chg)
       const fClass=freshnessClass(freshness)
+      const agoStr=fmtAgo(asOf)
 
       const card=document.createElement('div')
       card.className=`ticker-card ${isSkipped?'skipped-card':hasError?'error':'ok'}`
       card.dataset.asof=asOf||''
-
-      const agoStr=fmtAgo(asOf)
+      card.title='點擊查看 5 分 K 線'
+      card.onclick=()=>loadChart(sym,name)
 
       card.innerHTML=`
         <div class="ticker-head">
           <div class="symbol-block">
-            <div class="symbol">${sym}</div>
-            ${name?`<div class="name">${name}</div>`:''}
+            <div class="symbol">${sym}${name?` <span style="font-size:.7rem;color:#64748b;font-weight:400">${name}</span>`:''}</div>
           </div>
           <div class="price-block">
             <div class="price ${pClass}">${price!=null?price.toFixed(2):'N/A'}</div>
-            ${chg!=null?`<div class="change-text ${pClass}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgPct!=null?(chgPct>=0?'+':'')+chgPct.toFixed(2)+'%':''})</div>`:''}
+            ${chg!=null?`<div class="change-text ${pClass}">${chg>=0?'+':''}${chg.toFixed(2)}${chgPct!=null?' ('+( chgPct>=0?'+':'')+chgPct.toFixed(2)+'%)':''}</div>`:''}
           </div>
         </div>
         <div class="ticker-meta">
           ${freshness?`<span class="badge ${fClass}">${freshness}</span>`:''}
-          ${latency!=null?`<span class="badge latency">${latency}ms</span>`:''}
+          ${latency!=null?`<span class="badge">${latency}ms</span>`:''}
           ${agoStr?`<span class="badge ago" data-asof="${asOf||''}">${agoStr}</span>`:''}
         </div>
         ${errType?`<div class="err-msg">⚠ ${errType} — ${status}</div>`:''}
@@ -286,27 +328,125 @@ function renderAll(data){
           ${bucket?`<div class="detail-item">bucket <span class="dv">${bucket}</span></div>`:''}
           ${asOf?`<div class="detail-item">as_of <span class="dv">${new Date(asOf).toLocaleTimeString('zh-TW')}</span></div>`:''}
         </div>`
-
       sec.appendChild(card)
     })
     resultsDiv.appendChild(sec)
   })
 }
 
-// 每秒更新所有「幾秒前」badge
-function updateAgo(data){
-  document.querySelectorAll('.badge.ago[data-asof]').forEach(el=>{
-    const asOf=el.dataset.asof
-    if(asOf)el.textContent=fmtAgo(asOf)||''
+// ── Securities 表格 ───────────────────────────────────────
+function renderSecurities(rows){
+  const panel=document.getElementById('sec-panel')
+  if(!Array.isArray(rows)||!rows.length){panel.style.display='none';return}
+  panel.style.display='block'
+  const body=document.getElementById('sec-body')
+  body.innerHTML=`<table id="sec-table">
+    <thead><tr>
+      <th>代號</th><th>名稱</th><th>現價</th><th>漲跌</th><th>漲跌%</th>
+      <th>昨收</th><th>freshness</th><th>bucket</th><th>as_of</th><th>updated_at</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>{
+      const chg=Number(r.change)||0
+      const cls=priceClass(chg)
+      return`<tr>
+        <td>${r.symbol}</td>
+        <td>${r.name||'—'}</td>
+        <td class="${cls}">${r.price!=null?Number(r.price).toFixed(2):'—'}</td>
+        <td class="${cls}">${r.change!=null?(chg>=0?'+':'')+Number(r.change).toFixed(2):'—'}</td>
+        <td class="${cls}">${r.change_pct!=null?(Number(r.change_pct)>=0?'+':'')+Number(r.change_pct).toFixed(2)+'%':'—'}</td>
+        <td>${r.prev_close!=null?Number(r.prev_close).toFixed(2):'—'}</td>
+        <td>${r.data_freshness||'—'}</td>
+        <td>${r.bucket||'—'}</td>
+        <td>${r.as_of?new Date(r.as_of).toLocaleTimeString('zh-TW'):'—'}</td>
+        <td>${r.updated_at?new Date(r.updated_at).toLocaleTimeString('zh-TW'):'—'}</td>
+      </tr>`
+    }).join('')}</tbody>
+  </table>`
+}
+
+// ── 5 分 K 線圖 ───────────────────────────────────────────
+async function loadChart(symbol,name){
+  // highlight active card
+  document.querySelectorAll('.ticker-card').forEach(c=>c.classList.remove('active-chart'))
+  document.querySelectorAll('.ticker-card').forEach(c=>{
+    if(c.querySelector('.symbol')?.textContent?.startsWith(symbol))c.classList.add('active-chart')
   })
+
+  const panel=document.getElementById('chart-panel')
+  const container=document.getElementById('chart-container')
+  document.getElementById('chart-title').textContent=`${symbol}${name?' '+name:''} — 5 分 K`
+  panel.style.display='block'
+  container.innerHTML='<div class="chart-empty"><span class="spinner"></span> 載入中...</div>'
+
+  // 撈最近 3 小時的 quotes_live
+  const since=new Date(Date.now()-3*60*60*1000).toISOString()
+  const rows=await sbSelect('quotes_live',
+    `symbol=eq.${symbol}&quote_time=gte.${since}&select=last_price,quote_time&order=quote_time.asc&limit=500`)
+
+  if(!Array.isArray(rows)||rows.length<2){
+    container.innerHTML='<div class="chart-empty">資料不足（quotes_live 紀錄 < 2 筆），請先送出幾次 persist 查詢再試</div>'
+    return
+  }
+
+  // 聚合成 5 分 K
+  const candles=buildCandles(rows,5)
+  if(candles.length<1){
+    container.innerHTML='<div class="chart-empty">無法聚合 K 棒</div>'
+    return
+  }
+
+  // 建立圖表
+  container.innerHTML=''
+  if(chartInstance)chartInstance.remove()
+  chartInstance=LightweightCharts.createChart(container,{
+    width:container.clientWidth,
+    height:260,
+    layout:{background:{color:'#0f172a'},textColor:'#94a3b8'},
+    grid:{vertLines:{color:'#1e293b'},horzLines:{color:'#1e293b'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'#334155'},
+    timeScale:{borderColor:'#334155',timeVisible:true,secondsVisible:false},
+  })
+  candleSeries=chartInstance.addCandlestickSeries({
+    upColor:'#f87171',downColor:'#4ade80',
+    borderUpColor:'#f87171',borderDownColor:'#4ade80',
+    wickUpColor:'#f87171',wickDownColor:'#4ade80',
+  })
+  candleSeries.setData(candles)
+  chartInstance.timeScale().fitContent()
+
+  const first=new Date(candles[0].time*1000).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})
+  const last=new Date(candles[candles.length-1].time*1000).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})
+  document.getElementById('chart-range').textContent=`${first} ~ ${last}（${candles.length} 根）`
+  currentChartSymbol=symbol
+}
+
+function buildCandles(rows,intervalMin){
+  const ms=intervalMin*60*1000
+  const buckets={}
+  rows.forEach(r=>{
+    const t=new Date(r.quote_time).getTime()
+    const bucket=Math.floor(t/ms)*ms
+    const p=Number(r.last_price)
+    if(!p||isNaN(p))return
+    if(!buckets[bucket]){buckets[bucket]={open:p,high:p,low:p,close:p}}
+    else{
+      const b=buckets[bucket]
+      b.high=Math.max(b.high,p)
+      b.low=Math.min(b.low,p)
+      b.close=p
+    }
+  })
+  return Object.entries(buckets)
+    .sort((a,b)=>a[0]-b[0])
+    .map(([t,v])=>({time:Math.floor(Number(t)/1000),...v}))
 }
 
 function toggleRaw(){
   const box=document.getElementById('raw-box')
-  const btn=document.getElementById('raw-toggle')
   const show=box.style.display==='none'
   box.style.display=show?'block':'none'
-  btn.textContent=show?'▼ 隱藏原始 JSON':'▶ 顯示原始 JSON'
+  document.getElementById('raw-toggle').textContent=show?'▼ 隱藏原始 JSON':'▶ 顯示原始 JSON'
 }
 </script>
 </body>
