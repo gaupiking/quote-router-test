@@ -352,7 +352,12 @@ async function runQuery(){
   document.getElementById('results-panel').style.display='none'
 
   const body={symbols,mode,persist}
-  if(force_source) body.force_source=force_source
+  if(force_source){
+    body.force_source=force_source
+  } else if(persist){
+    // realtime 模式下 persist 需要 force_source，自動補上 fugle_rt
+    body.force_source='fugle_rt'
+  }
 
   try{
     const [quoteRes, secData]=await Promise.all([
