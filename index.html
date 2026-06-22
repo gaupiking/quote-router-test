@@ -210,10 +210,22 @@ function metaItem(label,val,cls=''){
 function setRtStatus(cls, text){
   const bar = document.getElementById('rt-status-bar')
   const txt = document.getElementById('rt-status-text')
-  bar.className = ''
+  bar.className=''
   bar.classList.add(cls)
-  bar.style.display = 'flex'
-  txt.textContent = text
+  bar.style.display='flex'
+  txt.textContent=text
+}
+
+function hideRtStatus(){
+  const bar=document.getElementById('rt-status-bar')
+  bar.style.display='none'
+  document.getElementById('rt-last-update').textContent=''
+}
+
+function stopRealtime(){
+  if(realtimeChannel){ sbClient.removeChannel(realtimeChannel); realtimeChannel=null }
+  if(reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null }
+  hideRtStatus()
 }
 
 function scheduleReconnect(){
@@ -326,8 +338,6 @@ function attachVisibilityRefresh(){
       const staleMs = Date.now() - lastFetchAt
       if(!lastFetchAt || staleMs > 30000){
         runQuery()
-      }else{
-        startRealtime(currentSymbols)
       }
     }
   }
@@ -346,11 +356,13 @@ async function runQuery(){
 
   currentSymbols = symbols
   if(agoTimer) clearInterval(agoTimer)
+  stopRealtime()
 
   btn.disabled=true
   btn.innerHTML='<span class="spinner"></span>查詢中...'
   document.getElementById('results-panel').style.display='none'
 
+  // 不自動補 force_source，讓 Edge Function 依 mode/時間自行決定
   const body={symbols,mode,persist}
   if(force_source) body.force_source=force_source
 
@@ -360,11 +372,11 @@ async function runQuery(){
       method:'POST',headers:HEADERS,body:JSON.stringify(body)
     }).then(r=>r.json())
 
-    lastFetchAt = Date.now()
-
-    // Step 2: Edge Function 寫完後再讀 securities，確保拿到最新 name
+    // Step 2: 寫完後再讀 securities，確保 name 已寫入
     const secData = await sbSelect('securities',
       `symbol=in.(${symbols.map(s=>`"${s}"`).join(',')})&select=symbol,name,price,prev_close,change,change_pct,data_freshness,bucket,type,as_of,updated_at&order=symbol`)
+
+    lastFetchAt = Date.now()
 
     document.getElementById('raw-box').textContent=JSON.stringify(quoteRes,null,2)
     document.getElementById('raw-toggle').textContent='▶ 顯示原始 JSON'
@@ -377,7 +389,13 @@ async function runQuery(){
     renderSecurities(secData)
     document.getElementById('results-panel').style.display='block'
 
-    startRealtime(symbols)
+    // 只有 realtime mode 才啟動 Realtime 推播
+    if(quoteRes.mode === 'realtime'){
+      startRealtime(symbols)
+    } else {
+      hideRtStatus()
+    }
+
     attachVisibilityRefresh()
 
     agoTimer=setInterval(()=>{
