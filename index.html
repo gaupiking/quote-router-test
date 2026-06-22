@@ -80,18 +80,16 @@
     #sec-table td.down{color:#4ade80}
     #raw-toggle{font-size:0.72rem;color:#475569;cursor:pointer;display:block;margin-top:10px}
     #raw-box{display:none;background:#020617;border-radius:7px;padding:12px;font-size:0.68rem;overflow:auto;white-space:pre-wrap;word-break:break-all;color:#94a3b8;margin-top:8px;max-height:350px}
-    /* Realtime 狀態列 */
     #rt-status-bar{font-size:0.72rem;padding:6px 12px;border-radius:6px;margin-bottom:10px;display:none;align-items:center;gap:6px}
-    #rt-status-bar.connected{background:#052e16;border:1px solid #166534;color:#4ade80;display:flex}
-    #rt-status-bar.connecting{background:#1c1917;border:1px solid #44403c;color:#a8a29e;display:flex}
-    #rt-status-bar.error{background:#2d0a0a;border:1px solid #991b1b;color:#f87171;display:flex}
+    #rt-status-bar.connected{background:#052e16;border:1px solid #166534;color:#4ade80}
+    #rt-status-bar.connecting{background:#1c1917;border:1px solid #44403c;color:#a8a29e}
+    #rt-status-bar.error{background:#2d0a0a;border:1px solid #991b1b;color:#f87171}
     .rt-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
   </style>
 </head>
 <body>
 <h1>📡 Quote Router v9 測試台</h1>
 
-<!-- 查詢參數 -->
 <div class="panel">
   <div class="panel-title">查詢參數</div>
   <div class="row">
@@ -126,10 +124,7 @@
   <button id="submit-btn" onclick="runQuery()">🚀 送出查詢</button>
 </div>
 
-<!-- 回應結果 -->
 <div id="results-panel" style="display:none">
-
-  <!-- Realtime 狀態列 -->
   <div id="rt-status-bar">
     <span class="rt-dot"></span>
     <span id="rt-status-text">連線中...</span>
@@ -143,7 +138,6 @@
     <div id="rate-bar" style="font-size:0.72rem;color:#64748b;margin-bottom:4px"></div>
   </div>
 
-  <!-- K線圖 -->
   <div class="panel" id="chart-panel">
     <div class="chart-header">
       <div>
@@ -155,10 +149,8 @@
     <div id="chart-container"></div>
   </div>
 
-  <!-- 各來源 quote 結果 -->
   <div id="results"></div>
 
-  <!-- securities DB 狀態 -->
   <div class="panel" id="sec-panel" style="display:none">
     <div class="panel-title">📦 securities（DB 現況）</div>
     <div id="sec-body"></div>
@@ -173,22 +165,23 @@ const SUPABASE_URL='https://murynwlbdgxkimfgunfx.supabase.co'
 const ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cnlud2xiZGd4a2ltZmd1bmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4Mzc4MDAsImV4cCI6MjA5NTQxMzgwMH0.Zhz9S4wUEaoQhMNke_EPoGqfdw21yvshNBFx4GUNfuI'
 const HEADERS={'Content-Type':'application/json','Authorization':`Bearer ${ANON_KEY}`,'apikey':ANON_KEY}
 
-// ── Supabase Client（Realtime 用）────────────────────────
 const sbClient = supabase.createClient(SUPABASE_URL, ANON_KEY)
+
 let realtimeChannel = null
 let currentSymbols = []
 let agoTimer = null
 let chartInstance = null
 let candleSeries = null
 let currentChartSymbol = null
+let lastFetchAt = 0
+let reconnectTimer = null
+let visibilityBound = false
 
-// ── Supabase REST helper ──────────────────────────────────
 async function sbSelect(table,params=''){
   const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{headers:{...HEADERS,'Accept':'application/json'}})
   return res.json()
 }
 
-// ── 格式工具 ─────────────────────────────────────────────
 function fmtAgo(iso){
   if(!iso)return null
   const d=Math.floor((Date.now()-new Date(iso).getTime())/1000)
@@ -197,21 +190,39 @@ function fmtAgo(iso){
   if(d<3600)return`${Math.floor(d/60)}分${d%60}秒前`
   return`${Math.floor(d/3600)}時${Math.floor((d%3600)/60)}分前`
 }
+
 function freshnessClass(f){
   if(!f)return''
   if(f==='near_realtime')return'rt'
   if(f==='delayed_20m+')return'delayed'
   return'eod'
 }
+
 function priceClass(chg){
   if(chg==null)return'flat'
   return chg>0?'up':chg<0?'down':'flat'
 }
+
 function metaItem(label,val,cls=''){
   return`<div class="meta-item"><span class="meta-label">${label}</span><span class="meta-val ${cls}">${val}</span></div>`
 }
 
-// ── Realtime 訂閱 ─────────────────────────────────────────
+function setRtStatus(cls, text){
+  const bar = document.getElementById('rt-status-bar')
+  const txt = document.getElementById('rt-status-text')
+  bar.className = ''
+  bar.classList.add(cls)
+  bar.style.display = 'flex'
+  txt.textContent = text
+}
+
+function scheduleReconnect(){
+  if (reconnectTimer) clearTimeout(reconnectTimer)
+  reconnectTimer = setTimeout(() => {
+    if (currentSymbols.length) startRealtime(currentSymbols)
+  }, 3000)
+}
+
 function startRealtime(symbols){
   if(realtimeChannel){
     sbClient.removeChannel(realtimeChannel)
@@ -231,28 +242,22 @@ function startRealtime(symbols){
         updateSecurityCard(row)
         updateSecurityTableRow(row)
         showRealtimeBadge(row.symbol)
-        const now = new Date().toLocaleTimeString('zh-TW')
-        document.getElementById('rt-last-update').textContent = `最後推播：${row.symbol} @ ${now}`
+        document.getElementById('rt-last-update').textContent =
+          `最後推播：${row.symbol} @ ${new Date().toLocaleTimeString('zh-TW')}`
       }
     )
     .subscribe((status) => {
       if(status === 'SUBSCRIBED') setRtStatus('connected','⚡ Realtime 已連線，自動推播更新中')
-      else if(status === 'CHANNEL_ERROR') setRtStatus('error','❌ Realtime 連線失敗')
-      else if(status === 'CLOSED') setRtStatus('connecting','⏳ 重新連線中...')
+      else if(status === 'CHANNEL_ERROR'){
+        setRtStatus('error','❌ Realtime 連線失敗，3 秒後重連')
+        scheduleReconnect()
+      } else if(status === 'CLOSED'){
+        setRtStatus('connecting','⏳ Realtime 已關閉，重新連線中...')
+        scheduleReconnect()
+      }
     })
 }
 
-function setRtStatus(cls, text){
-  const bar = document.getElementById('rt-status-bar')
-  const txt = document.getElementById('rt-status-text')
-  bar.className = `${cls}`
-  bar.id = 'rt-status-bar'
-  bar.classList.add(cls)
-  bar.style.display = 'flex'
-  txt.textContent = text
-}
-
-// 更新 ticker card
 function updateSecurityCard(row){
   const chg = Number(row.change)||0
   const pClass = priceClass(chg)
@@ -272,12 +277,14 @@ function updateSecurityCard(row){
     }
     if(row.as_of){
       const agoEl = card.querySelector('.badge.ago')
-      if(agoEl){ agoEl.dataset.asof=row.as_of; agoEl.textContent=fmtAgo(row.as_of) }
+      if(agoEl){
+        agoEl.dataset.asof = row.as_of
+        agoEl.textContent = fmtAgo(row.as_of)
+      }
     }
   })
 }
 
-// 更新 securities 表格列
 function updateSecurityTableRow(row){
   const tbl = document.getElementById('sec-table')
   if(!tbl) return
@@ -285,15 +292,17 @@ function updateSecurityTableRow(row){
     if(tr.cells[0]?.textContent !== row.symbol) return
     const chg = Number(row.change)||0
     const cls = priceClass(chg)
-    tr.cells[2].className=cls; tr.cells[2].textContent=row.price!=null?Number(row.price).toFixed(2):'—'
-    tr.cells[3].className=cls; tr.cells[3].textContent=row.change!=null?(chg>=0?'+':'')+chg.toFixed(2):'—'
-    tr.cells[4].className=cls; tr.cells[4].textContent=row.change_pct!=null?(Number(row.change_pct)>=0?'+':'')+Number(row.change_pct).toFixed(2)+'%':'—'
+    tr.cells[2].className=cls
+    tr.cells[2].textContent=row.price!=null?Number(row.price).toFixed(2):'—'
+    tr.cells[3].className=cls
+    tr.cells[3].textContent=row.change!=null?(chg>=0?'+':'')+chg.toFixed(2):'—'
+    tr.cells[4].className=cls
+    tr.cells[4].textContent=row.change_pct!=null?(Number(row.change_pct)>=0?'+':'')+Number(row.change_pct).toFixed(2)+'%':'—'
     tr.cells[8].textContent=row.as_of?new Date(row.as_of).toLocaleTimeString('zh-TW'):'—'
     tr.cells[9].textContent=row.updated_at?new Date(row.updated_at).toLocaleTimeString('zh-TW'):'—'
   })
 }
 
-// ⚡ 閃爍「剛更新」badge
 function showRealtimeBadge(symbol){
   document.querySelectorAll('.ticker-card').forEach(card=>{
     const sym = card.querySelector('.symbol')?.textContent?.trim().split(' ')[0]
@@ -310,7 +319,23 @@ function showRealtimeBadge(symbol){
   })
 }
 
-// ── 主查詢 ────────────────────────────────────────────────
+function attachVisibilityRefresh(){
+  if(visibilityBound) return
+  const handler = () => {
+    if(document.visibilityState === 'visible'){
+      const staleMs = Date.now() - lastFetchAt
+      if(!lastFetchAt || staleMs > 30000){
+        runQuery()
+      }else{
+        startRealtime(currentSymbols)
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', handler)
+  window.addEventListener('focus', handler)
+  visibilityBound = true
+}
+
 async function runQuery(){
   const btn=document.getElementById('submit-btn')
   const symbols=document.getElementById('symbols').value.split(',').map(s=>s.trim()).filter(Boolean)
@@ -320,13 +345,14 @@ async function runQuery(){
   if(!symbols.length){alert('請輸入股票代號');return}
 
   currentSymbols = symbols
-  if(agoTimer)clearInterval(agoTimer)
+  if(agoTimer) clearInterval(agoTimer)
+
   btn.disabled=true
   btn.innerHTML='<span class="spinner"></span>查詢中...'
   document.getElementById('results-panel').style.display='none'
 
   const body={symbols,mode,persist}
-  if(force_source)body.force_source=force_source
+  if(force_source) body.force_source=force_source
 
   try{
     const [quoteRes, secData]=await Promise.all([
@@ -336,33 +362,37 @@ async function runQuery(){
       sbSelect('securities',`symbol=in.(${symbols.map(s=>`"${s}"`).join(',')})&select=symbol,name,price,prev_close,change,change_pct,data_freshness,bucket,type,as_of,updated_at&order=symbol`)
     ])
 
+    lastFetchAt = Date.now()
+
     document.getElementById('raw-box').textContent=JSON.stringify(quoteRes,null,2)
     document.getElementById('raw-toggle').textContent='▶ 顯示原始 JSON'
     document.getElementById('raw-box').style.display='none'
 
     const nameMap={}
-    if(Array.isArray(secData))secData.forEach(r=>{nameMap[r.symbol]=r.name})
+    if(Array.isArray(secData)) secData.forEach(r=>{nameMap[r.symbol]=r.name})
 
     renderAll(quoteRes,nameMap)
     renderSecurities(secData)
     document.getElementById('results-panel').style.display='block'
 
-    // 啟動 Realtime 訂閱
     startRealtime(symbols)
+    attachVisibilityRefresh()
 
-    agoTimer=setInterval(()=>document.querySelectorAll('.badge.ago[data-asof]').forEach(el=>{
-      if(el.dataset.asof)el.textContent=fmtAgo(el.dataset.asof)||''
-    }),1000)
+    agoTimer=setInterval(()=>{
+      document.querySelectorAll('.badge.ago[data-asof]').forEach(el=>{
+        if(el.dataset.asof) el.textContent = fmtAgo(el.dataset.asof)||''
+      })
+    },1000)
 
   }catch(e){
     document.getElementById('results').innerHTML=`<div style="color:#f87171">❌ 請求失敗：${e.message}</div>`
     document.getElementById('results-panel').style.display='block'
   }
+
   btn.disabled=false
   btn.innerHTML='🚀 送出查詢'
 }
 
-// ── 渲染總覽 ──────────────────────────────────────────────
 function renderAll(data,nameMap){
   const m=data.meta||{}
   document.getElementById('meta-bar').innerHTML=[
@@ -395,7 +425,7 @@ function renderAll(data,nameMap){
     sec.className='source-section'
     sec.innerHTML=`<div class="source-label">${sourceKey}</div>`
     ;(rows||[]).forEach((q)=>{
-      if(!q)return
+      if(!q) return
       const sym=q.symbol||'?'
       const name=nameMap[sym]||null
       const price=q.last_price
@@ -451,7 +481,6 @@ function renderAll(data,nameMap){
   })
 }
 
-// ── Securities 表格 ───────────────────────────────────────
 function renderSecurities(rows){
   const panel=document.getElementById('sec-panel')
   if(!Array.isArray(rows)||!rows.length){panel.style.display='none';return}
@@ -481,7 +510,6 @@ function renderSecurities(rows){
   </table>`
 }
 
-// ── 5 分 K 線圖 ───────────────────────────────────────────
 async function loadChart(symbol,name){
   document.querySelectorAll('.ticker-card').forEach(c=>c.classList.remove('active-chart'))
   document.querySelectorAll('.ticker-card').forEach(c=>{
@@ -510,7 +538,7 @@ async function loadChart(symbol,name){
   }
 
   container.innerHTML=''
-  if(chartInstance)chartInstance.remove()
+  if(chartInstance) chartInstance.remove()
   chartInstance=LightweightCharts.createChart(container,{
     width:container.clientWidth,
     height:260,
@@ -541,8 +569,8 @@ function buildCandles(rows,intervalMin){
     const t=new Date(r.quote_time).getTime()
     const bucket=Math.floor(t/ms)*ms
     const p=Number(r.last_price)
-    if(!p||isNaN(p))return
-    if(!buckets[bucket]){buckets[bucket]={open:p,high:p,low:p,close:p}}
+    if(!p || isNaN(p)) return
+    if(!buckets[bucket]) buckets[bucket]={open:p,high:p,low:p,close:p}
     else{
       const b=buckets[bucket]
       b.high=Math.max(b.high,p)
@@ -561,6 +589,23 @@ function toggleRaw(){
   box.style.display=show?'block':'none'
   document.getElementById('raw-toggle').textContent=show?'▼ 隱藏原始 JSON':'▶ 顯示原始 JSON'
 }
+
+window.addEventListener('resize', () => {
+  if(chartInstance && currentChartSymbol){
+    const container = document.getElementById('chart-container')
+    chartInstance.applyOptions({ width: container.clientWidth })
+  }
+})
+
+window.addEventListener('beforeunload', () => {
+  if(realtimeChannel) sbClient.removeChannel(realtimeChannel)
+  if(agoTimer) clearInterval(agoTimer)
+  if(reconnectTimer) clearTimeout(reconnectTimer)
+})
+
+document.addEventListener('DOMContentLoaded', () => {
+  attachVisibilityRefresh()
+})
 </script>
 </body>
 </html>
