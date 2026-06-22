@@ -352,22 +352,19 @@ async function runQuery(){
   document.getElementById('results-panel').style.display='none'
 
   const body={symbols,mode,persist}
-  if(force_source){
-    body.force_source=force_source
-  } else if(persist){
-    // realtime 模式下 persist 需要 force_source，自動補上 fugle_rt
-    body.force_source='fugle_rt'
-  }
+  if(force_source) body.force_source=force_source
 
   try{
-    const [quoteRes, secData]=await Promise.all([
-      fetch(`${SUPABASE_URL}/functions/v1/quote-router-v9`,{
-        method:'POST',headers:HEADERS,body:JSON.stringify(body)
-      }).then(r=>r.json()),
-      sbSelect('securities',`symbol=in.(${symbols.map(s=>`"${s}"`).join(',')})&select=symbol,name,price,prev_close,change,change_pct,data_freshness,bucket,type,as_of,updated_at&order=symbol`)
-    ])
+    // Step 1: 先等 Edge Function 完成（含 persist 寫入 DB）
+    const quoteRes = await fetch(`${SUPABASE_URL}/functions/v1/quote-router-v9`,{
+      method:'POST',headers:HEADERS,body:JSON.stringify(body)
+    }).then(r=>r.json())
 
     lastFetchAt = Date.now()
+
+    // Step 2: Edge Function 寫完後再讀 securities，確保拿到最新 name
+    const secData = await sbSelect('securities',
+      `symbol=in.(${symbols.map(s=>`"${s}"`).join(',')})&select=symbol,name,price,prev_close,change,change_pct,data_freshness,bucket,type,as_of,updated_at&order=symbol`)
 
     document.getElementById('raw-box').textContent=JSON.stringify(quoteRes,null,2)
     document.getElementById('raw-toggle').textContent='▶ 顯示原始 JSON'
